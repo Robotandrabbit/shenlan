@@ -1,0 +1,8 @@
+piecewise_jerk_planner:
+  _target_: nuplan.planning.simulation.planner.project2.piecewise_jerk_planner.PiecewiseJerkPlanner
+  _convert_: 'all'
+  horizon_seconds: 8.0
+  sampling_time: 0.25
+  acceleration: [0.0, 0.0] # x (longitudinal), y (lateral)
+  max_velocity: 5.0
+  steering_angle: 0.0
