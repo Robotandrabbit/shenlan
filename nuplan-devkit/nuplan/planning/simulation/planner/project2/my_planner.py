@@ -148,7 +148,7 @@ class MyPlanner(AbstractPlanner):
         trajectory: List[EgoState] = [state]
         for iter in range(int(horizon_time.time_us / sampling_time.time_us)):
             relative_time = (iter + 1) * sampling_time.time_s
-            # 根据relative_time 和 speed planning 计算 velocity accelerate （三次多项式）
+            # 根据 relative_time 和 speed planning 计算 velocity accelerate （三次多项式）
             s, velocity, accelerate = cal_dynamic_state(relative_time, optimal_speed_t, optimal_speed_s,
                                                         optimal_speed_s_dot, optimal_speed_s_2dot)
             # 根据当前时间下的s 和 路径规划结果 计算 x y heading kappa （线形插值）
