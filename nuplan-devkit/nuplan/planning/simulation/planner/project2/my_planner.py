@@ -24,6 +24,8 @@ from nuplan.common.actor_state.state_representation import StateSE2, StateVector
 from nuplan.common.actor_state.agent import Agent
 from nuplan.common.actor_state.tracked_objects import TrackedObject, TrackedObjects
 
+from nuplan.planning.simulation.planner.project2.lattice_path_planning import LatticePathPlanning
+
 logger = logging.getLogger(__name__)
 
 
@@ -112,15 +114,10 @@ class MyPlanner(AbstractPlanner):
         """
 
 
-
-
-
-
-        """
-        # 可以实现基于采样的planer或者横纵向解耦的planner，此处给出planner的示例，仅提供实现思路供参考
+        # 可以实现基于采样的planer或者横纵向解耦的planner,此处给出planner的示例,仅提供实现思路供参考
         # 1.Path planning
-        optimal_path_l, optimal_path_dl, optimal_path_ddl, optimal_path_s = path_planning( \
-            ego_state, reference_path_provider)
+        lattice_path_planning = LatticePathPlanning (ego_state, reference_path_provider, horizon_time, sampling_time)
+        optimal_path_l, optimal_path_dl, optimal_path_ddl, optimal_path_s = lattice_path_planning.path_planning()
 
         # 2.Transform path planning result to cartesian frame
         path_idx2s, path_x, path_y, path_heading, path_kappa = transform_path_planning(optimal_path_s, optimal_path_l, \
@@ -130,7 +127,7 @@ class MyPlanner(AbstractPlanner):
 
         # 3.Speed planning
         optimal_speed_s, optimal_speed_s_dot, optimal_speed_s_2dot, optimal_speed_t = speed_planning( \
-            ego_state, horizon_time.time_s, max_velocity, objects, \
+            ego_state, horizon_time.time_s, max_velocity, object, \
             path_idx2s, path_x, path_y, path_heading, path_kappa)
 
         # 4.Produce ego trajectory
@@ -167,7 +164,7 @@ class MyPlanner(AbstractPlanner):
             )
 
             trajectory.append(state)
-        """
+
 
 
 
