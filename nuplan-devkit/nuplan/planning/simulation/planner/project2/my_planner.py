@@ -112,12 +112,8 @@ class MyPlanner(AbstractPlanner):
         """
 
 
-
-
-
-
         """
-        # 可以实现基于采样的planer或者横纵向解耦的planner，此处给出planner的示例，仅提供实现思路供参考
+        # 可以实现基于采样的planer或者横纵向解耦的planner,此处给出planner的示例,仅提供实现思路供参考
         # 1.Path planning
         optimal_path_l, optimal_path_dl, optimal_path_ddl, optimal_path_s = path_planning( \
             ego_state, reference_path_provider)
