@@ -24,7 +24,7 @@ class DpDecider:
                  max_acc: float,
                  max_dec: float) -> None:
         self._obs_trajectory = obs_trajectory
-        self._obs_radius = obs_radius
+        self._obs_radius = obs_radius  # what?
         self._path_idx2s = path_idx2s
         self._path_x = path_x
         self._path_y = path_y
@@ -71,6 +71,8 @@ class DpDecider:
                 r_h = np.array([x, y])
                 r_r = np.array([proj_x_set[0], proj_y_set[0]])
                 l = np.dot((r_h - r_r), n_r)
+                # Note(wanghao): 只考虑与自车在空间上有overlap的snapshot
+                # 通过判断预测的snapshot距离path的横向距离是否小于半个车宽来判断是否有overlap.
                 if s >= 0 and s <= self._path_idx2s[-1] and abs(l) <= self._ego_half_width:
                     points_ts.append((t, s))
                 # if s <= self._path_idx2s[-1]: # and abs(l) <= self._ego_half_width:
@@ -170,6 +172,7 @@ class DpDecider:
         s_lb = [0] * len(t_list)
         s_ub = [max_s] * len(t_list)
         # 根据dp结果和_obs_ts，计算s_lb, s_ub
+        # Note(wanghao): 这在 speed decision中起什么作用呢？
         for i in range(len(self._obs_ts)):
             obs_ts = self._obs_ts[i]
             obs_interp_ts = self._obs_interp_ts[i]
@@ -194,7 +197,7 @@ class DpDecider:
                     if s_lb[j] > s_ub[j] - 0.5:
                         s_lb[j] = s_ub[j] - 0.5
 
-
+        # 最优的 st rollout profile
         plt.plot(dp_speed_t, dp_speed_s)
 
         # 添加标题和标签
@@ -229,6 +232,7 @@ class DpDecider:
         print('s_ub: ', s_ub)
 
         dp_s_out = [s - self._ego_length/2 for s in dp_speed_s]
+        # 输出了 最优 speed profile 的 s 和 v
         return s_lb, s_ub, dp_s_out, dp_st_s_dot
 
 
@@ -252,6 +256,7 @@ class DpDecider:
             # 边的起点不是dp的起点
             s_start, t_start = self._CalcSTCoordinate(row_start, col_start, s_list, t_list)
             s_dot_start = dp_st_s_dot[row_start][col_start]
+        # Note(wanghao): 当 s_end = 0 时， s_end - s_start < 0, 此时 cur_s_dot < 0;
         cur_s_dot = (s_end - s_start) / (t_end - t_start)
         cur_s_dot2 = (cur_s_dot - s_dot_start)/(t_end - t_start)
         # 计算推荐速度代价
@@ -316,6 +321,7 @@ class DpDecider:
         buffer = obs_radius + self._ego_length/2
         if abs(min_dis) < buffer:
             # collision_cost = w_cost_obs
+            # 距离过近或者已经碰撞的 cost 设置为无穷大
             collision_cost = math.inf
         elif abs(min_dis) > buffer and abs(min_dis) < buffer*3:
             collision_cost = w_cost_obs**((buffer - abs(min_dis))/buffer + 2)

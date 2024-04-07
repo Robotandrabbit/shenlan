@@ -24,8 +24,8 @@ class SimplePredictor(AbstractPredictor):
         cv_waypoints = []
         if isinstance(object, Agent):
           for time in np.arange(self._ego_state.time_seconds, self._ego_state.time_seconds + self._duration, self._sample_time):
-              x = object.center.x + time * object.velocity * np.cos(object.center.heading)
-              y = object.center.y + time * object.velocity * np.sin(object.center.heading)
+              x = object.center.x + time * object.velocity.magnitude() * np.cos(object.center.heading)
+              y = object.center.y + time * object.velocity.magnitude() * np.sin(object.center.heading)
               cv_waypoints.append(Waypoint(time_point=time, 
                                            oriented_box=OrientedBox.from_new_pose(object.box, StateSE2(x, y, object.center.heading)), 
                                            velocity=object.velocity))
@@ -43,7 +43,7 @@ class SimplePredictor(AbstractPredictor):
 
             # TODO：1.Predicted the Trajectory of object
             for object in objects:
-                predicted_trajectories = [self.constant_velocity]  # predicted_trajectories : List[PredictedTrajectory]
+                predicted_trajectories = [self.constant_velocity(object)]  # predicted_trajectories : List[PredictedTrajectory]
                 object.predictions = predicted_trajectories
 
             return objects

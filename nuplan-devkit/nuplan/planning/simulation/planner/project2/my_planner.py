@@ -93,6 +93,17 @@ class MyPlanner(AbstractPlanner):
                                                     self.horizon_time, self.sampling_time, self.max_velocity)
 
         return InterpolatedTrajectory(trajectory)
+    
+    def get_constant_speed_profile(self, horizon_time:float, sampling_time:float, default_velocity:float):
+        optimal_speed_s, optimal_speed_s_dot, optimal_speed_s_2dot, optimal_speed_t = [], [], [], []
+        t = 0.0
+        while t < horizon_time /sampling_time:
+            optimal_speed_s.append(5.0 * t)
+            optimal_speed_s_dot.append(5.0)
+            optimal_speed_s_2dot.append(0.0)
+            optimal_speed_t.append(t)
+            t += sampling_time
+        return optimal_speed_s, optimal_speed_s_dot, optimal_speed_s_2dot, optimal_speed_t
 
     # TODO: 2. Please implement your own trajectory planning.
     def planning(self,
@@ -126,10 +137,13 @@ class MyPlanner(AbstractPlanner):
                                                                                        reference_path_provider)
 
         # 3.Speed planning
-        optimal_speed_s, optimal_speed_s_dot, optimal_speed_s_2dot, optimal_speed_t = speed_planning( \
-            ego_state, horizon_time.time_s, max_velocity, object, \
-            path_idx2s, path_x, path_y, path_heading, path_kappa)
-
+        # optimal_speed_s, optimal_speed_s_dot, optimal_speed_s_2dot, optimal_speed_t = speed_planning( \
+        #     ego_state, horizon_time.time_s, max_velocity, object, \
+        #     path_idx2s, path_x, path_y, path_heading, path_kappa)
+        # 匀速运动 5m/s
+        optimal_speed_s, optimal_speed_s_dot, optimal_speed_s_2dot, optimal_speed_t = \
+            self.get_constant_speed_profile(horizon_time.time_s, sampling_time.time_s, max_velocity)
+            
         # 4.Produce ego trajectory
         state = EgoState(
             car_footprint=ego_state.car_footprint,
@@ -164,13 +178,5 @@ class MyPlanner(AbstractPlanner):
             )
 
             trajectory.append(state)
-
-
-
-
-
-
-
-
-        trajectory = []
+        
         return trajectory

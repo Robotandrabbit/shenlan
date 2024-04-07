@@ -42,6 +42,7 @@ def cal_project_point(
     """
     cartesian2frenet的辅助函数 通过match point计算project point
     :param
+    :Note(wanghao)投影点说的是参考线上的点
     :return proj_x_set 投影点的x
     :return proj_y_set 投影点的y
     :return proj_heading_set 投影点的heading
@@ -63,10 +64,12 @@ def cal_project_point(
         vector_match_point_direction = np.array([math.cos(match_point_heading), math.sin(match_point_heading)])
         vector_r = np.array([x_set[idx], y_set[idx]])
         vector_d = vector_r - vector_match_point
-        ds = np.dot(vector_d, vector_match_point_direction)
-        vector_proj_point = vector_match_point + ds * vector_match_point_direction
+        ds = np.dot(vector_d, vector_match_point_direction) # vector_d 在参考线上的投影
+        vector_proj_point = vector_match_point + ds * vector_match_point_direction # 参考线上的匹配点坐标
+        # Note(wanghao): 
+        # proj_heading 的计算原理用到了曲率的定义：沿着ds方向两点的 heading 变化率.
         proj_heading = match_point_heading + match_point_kappa * ds
-        proj_kappa = match_point_kappa
+        proj_kappa = match_point_kappa   # 这里是近似约等于参考点的 kappa
         proj_x = vector_proj_point[0]
         proj_x_set.append(proj_x)
         proj_y = vector_proj_point[1]

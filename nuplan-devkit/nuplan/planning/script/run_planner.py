@@ -10,6 +10,7 @@ from nuplan.planning.simulation.planner.idm_planner import IDMPlanner
 from tutorials.utils.tutorial_utils import construct_simulation_hydra_paths
 
 # Location of paths with all simulation configs
+# os.chdir(os.environ['HOME']+'/shenlan/nuplan-devkit/nuplan/planning/script')
 BASE_CONFIG_PATH = os.path.join(os.getenv('NUPLAN_TUTORIAL_PATH', ''), '../script')
 simulation_hydra_paths = construct_simulation_hydra_paths(BASE_CONFIG_PATH)
 

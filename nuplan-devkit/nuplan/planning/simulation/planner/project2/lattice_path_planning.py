@@ -30,20 +30,21 @@ class LatticePathPlanning:
         end_d_candidates = np.array([0.0, -0.5, 0.5])
         end_s_candidates = np.array([10.0, 20.0, 40.0])
         
-        sampled_state = []
+        sampled_states = []
         for s in end_s_candidates:
             for d in end_d_candidates:
                 state = np.array([d, 0.0, 0.0, s])
-                sampled_state.append(state)
+                sampled_states.append(state)
+        return sampled_states
 
     def evaluate_trajectory(self, trajectory: list[QuinticPolynomial, QuinticPolynomial]) -> float:
-        cost = 0
+        cost = 0.0
         # 1. longitudinal progress cost
-        progress = trajectory[1].get_point(self.horizon_time)
+        progress = trajectory[1].get_point(self.horizon_time.time_s)
         if (progress < MAXIMUM_PROGRESS):
             cost += WEIGHT_PROGRESS * (MAXIMUM_PROGRESS - progress) / MAXIMUM_PROGRESS
         
-        for t in range(0, self.horizon_time, self.sampling_time):
+        for t in np.arange(0.0, self.horizon_time.time_s, self.sampling_time.time_s):
             # 2. lateral smooth cost
             lateral_jerk = trajectory[0].get_third_derivative(t)
             if (lateral_jerk > 1.0):
@@ -60,7 +61,7 @@ class LatticePathPlanning:
                 cost += WEIGHT_OFFSET * (lateral_offset - 0.5) / MAXIMUM_OFFSET
             
             # 5. TODO(wanghao): collision cost
-            
+        return cost
         
 
     def get_optimal_trajectory(self, trajectories) -> list[QuinticPolynomial, QuinticPolynomial]:
@@ -82,10 +83,10 @@ class LatticePathPlanning:
 
         init_cartesian_state = np.array([self.ego_state.car_footprint.oriented_box.center.x,
                                         self.ego_state.car_footprint.oriented_box.center.y,
-                                        self.ego_state.dynamic_car_state.rear_axle_velocity_2d * cos_h,
-                                        self.ego_state.dynamic_car_state.rear_axle_velocity_2d * sin_h,
-                                        self.ego_state.dynamic_car_state.rear_axle_acceleration_2d * cos_h,
-                                        self.ego_state.dynamic_car_state.rear_axle_acceleration_2d * sin_h])
+                                        self.ego_state.dynamic_car_state.rear_axle_velocity_2d.magnitude() * cos_h,
+                                        self.ego_state.dynamic_car_state.rear_axle_velocity_2d.magnitude() * sin_h,
+                                        self.ego_state.dynamic_car_state.rear_axle_acceleration_2d.magnitude() * cos_h,
+                                        self.ego_state.dynamic_car_state.rear_axle_acceleration_2d.magnitude() * sin_h])
 
         reference_line = np.array([self.reference_line_provider._x_of_reference_line,
                                    self.reference_line_provider._y_of_reference_line,
@@ -93,12 +94,12 @@ class LatticePathPlanning:
                                    self.reference_line_provider._kappa_of_reference_line,
                                    self.reference_line_provider._s_of_reference_line])
         
-        init_frenet_state = cartesian2frenet(init_cartesian_state[0],
-                                             init_cartesian_state[1],
-                                             init_cartesian_state[2],
-                                             init_cartesian_state[3],
-                                             init_cartesian_state[4],
-                                             init_cartesian_state[5],
+        init_frenet_state = cartesian2frenet([init_cartesian_state[0]],
+                                             [init_cartesian_state[1]],
+                                             [init_cartesian_state[2]],
+                                             [init_cartesian_state[3]],
+                                             [init_cartesian_state[4]],
+                                             [init_cartesian_state[5]],
                                              reference_line[0],
                                              reference_line[1],
                                              reference_line[2],
@@ -108,14 +109,15 @@ class LatticePathPlanning:
                
         end_frenet_states = self.sample_lateral_end_state()
         trajectories = []
+        # 对每个采样的终点
         for end_frenet_state in end_frenet_states:
             # lateral(d/l) path planning
-            lateral_curve = QuinticPolynomial(init_frenet_state[1], init_frenet_state[4], init_frenet_state[7],
-                                              end_frenet_state[0], end_frenet_state[1], end_frenet_state[2], self.horizon_time)
+            lateral_curve = QuinticPolynomial(init_frenet_state[1][0], init_frenet_state[4][0], init_frenet_state[7][0],
+                                              end_frenet_state[0], end_frenet_state[1], end_frenet_state[2], self.horizon_time.time_s)
             # longitudinal path planning: velocity = 15m/s; accelaration = 0.0;
-            longitudinal_curve = QuinticPolynomial(init_frenet_state[0], init_frenet_state[2], init_frenet_state[6],
-                                                   end_frenet_state[3], 15.0, 0.0, self.horizon_time)
-            trajectories.append(lateral_curve, longitudinal_curve)
+            longitudinal_curve = QuinticPolynomial(init_frenet_state[0][0], init_frenet_state[2][0], init_frenet_state[6][0],
+                                                   end_frenet_state[3], 15.0, 0.0, self.horizon_time.time_s)
+            trajectories.append([lateral_curve, longitudinal_curve])
         
         # get the optimal trajectory
         optimal_trajectory = self.get_optimal_trajectory(trajectories)
@@ -125,7 +127,7 @@ class LatticePathPlanning:
         dl = []
         ddl = []
         s = []
-        for t in range(0, self.horizon_time, self.sampling_time):
+        for t in np.arange(0, self.horizon_time.time_s, self.sampling_time.time_s):
             l.append(optimal_trajectory[0].get_point(t))
             dl.append(optimal_trajectory[0].get_first_derivative(t))
             ddl.append(optimal_trajectory[0].get_second_derivative(t))

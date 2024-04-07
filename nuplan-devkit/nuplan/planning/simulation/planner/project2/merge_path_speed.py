@@ -43,7 +43,7 @@ def cal_dynamic_state(
     s_dot_set: List[float], 
     s_2dot_set: List[float]):
     """
-    采用三次多项式关系，根据relative_time 和 speed planning 计算 velocity accelerate TODO:有空仔细推导一下
+    采用三次多项式关系,根据relative_time 和 speed planning 计算 velocity accelerate TODO:有空仔细推导一下
     :param relative_time
     :param t_set
     :param s_set
@@ -79,7 +79,7 @@ def cal_pose(
     path_heading: List[float], 
     path_kappa: List[float]) -> Tuple[float, float, float, float]:
     """
-    采用一维插值，根据当前时间下的s 和 规划融合的结果 计算 x y heading kappa
+    采用一维插值,根据当前时间下的s 和 规划融合的结果 计算 x y heading kappa
     """
     f_x = interp1d(path_idx2s, path_x)
     f_y = interp1d(path_idx2s, path_y)
