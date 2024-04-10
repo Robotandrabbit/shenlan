@@ -131,8 +131,8 @@ def cartesian2frenet(
     :return s_set
     :return l_set
     :return s_dot_set
-    :return l_dot_set
-    :return dl_set
+    :return l_dot_set  note(wanghao): dl / ds
+    :return dl_set     note(wanghao): dl / dt
     :return l_dot2_set
     :return s_dot2_set
     :return ddl_set

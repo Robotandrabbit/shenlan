@@ -34,20 +34,20 @@ class LatticePathPlanning:
     # 横向上：在 d-s 维度采样。相比较 d-t 采样，d-s 可以明确自车局部的终点，也可以根据 s 获取车道宽度
     # 约束采样的范围
     def sample_lateral_end_state_ds(self, init_frenet_state):
-        end_d_candidates = np.array([-0.5, 0.0, 0.5])
-        end_s_candidates = np.array([10.0, 20.0, 40.0])
+        end_d_candidates = np.arange(-1.0, 1.2, 0.5)
+        end_s_candidates = np.array([init_frenet_state[0][0] + 10.0,
+                                     init_frenet_state[0][0] + 20.0,
+                                     init_frenet_state[0][0] + 40.0])
         lb_set, rb_set = self.reference_line_provider.get_boundary(end_s_candidates)
-        print("lb[0], rb[0]: ", lb_set, rb_set)
         
         sampled_states = []
         for idx in range(len(end_s_candidates)):
             for d in end_d_candidates:
                 # 检查超出道路边界
-                sampled_l = init_frenet_state[1][0] + d
-                if (sampled_l > lb_set[idx] or sampled_l < rb_set[idx]):
+                if (d > lb_set[idx] or d < rb_set[idx]):
                     continue
                 # 基于自车当前位置采样
-                state = np.array([sampled_l, 0.0, 0.0, end_s_candidates[idx]])
+                state = np.array([d, 0.0, 0.0, end_s_candidates[idx]])
                 sampled_states.append(state)
         return sampled_states
     
@@ -92,10 +92,10 @@ class LatticePathPlanning:
             if (lateral_offset > 0.5):
                 cost += WEIGHT_OFFSET * (lateral_offset - 0.5) / MAXIMUM_OFFSET
             
-            # 4. TODO(wanghao): collision cost
+            # 4. TODO(wanghao): collision cost:static agent.
         return cost
 
-    def is_valid_lon_trajectory(self, lon_trajectory) -> bool:
+    def is_valid_lon_trajectory(self, lon_trajectory:QuarticPolynominal) -> bool:
         t = 0.0
         while (t < lon_trajectory.get_time()):
             velocity = lon_trajectory.get_first_derivative(t)
@@ -103,7 +103,7 @@ class LatticePathPlanning:
             if (velocity > 10.0 and velocity < 0.0):
                 return False
             
-            if (accleration > 5.0 and accleration < -5.0):
+            if (accleration > 10.0 and accleration < -10.0):
                 return False
             
             t += 0.1
@@ -113,6 +113,7 @@ class LatticePathPlanning:
         min_score = float('+inf')
         best_lon_trajectory = None
         best_lat_trajectory = None
+        has_valid_traj = False
         for lon_trajectory in lon_trajectories:
             # Check if lon_trajectory is valid.
             if (not self.is_valid_lon_trajectory(lon_trajectory)):
@@ -123,7 +124,10 @@ class LatticePathPlanning:
                     min_score = score
                     best_lon_trajectory = lon_trajectory
                     best_lat_trajectory = lat_trajectory
+                    has_valid_traj = True
         # Combine two 1d trajectories to one 2d trajectory
+        if (not has_valid_traj):    
+            print("Failed to sample trajectory")
         return best_lat_trajectory, best_lon_trajectory
 
 
@@ -161,10 +165,22 @@ class LatticePathPlanning:
         lat_trajectory, lon_trajectory = [], []
         # lateral(l + s) path planning (l_s, dl_s ,ddl_s, l_e, dl_e, ddl_e, s)
         end_lat_states = self.sample_lateral_end_state_ds(init_frenet_state)
+        print("end_lat_states size:", len(end_lat_states))
+        # 可视化横向采样的path
+        # plt.figure()
         for end_lat_state in end_lat_states:
-            lateral_curve = QuinticPolynomial(init_frenet_state[1][0], init_frenet_state[4][0], init_frenet_state[7][0],
+            lateral_curve = QuinticPolynomial(init_frenet_state[1][0], init_frenet_state[3][0], init_frenet_state[5][0],
                                               end_lat_state[0], end_lat_state[1], end_lat_state[2], end_lat_state[3])
             lat_trajectory.append(lateral_curve)
+            # s, l = [], []
+            # for s_sample in np.arange(init_frenet_state[1][0], end_lat_state[3], 0.2):
+            #     s.append(s_sample)
+            #     l.append(lateral_curve.get_point(s_sample))
+            # plt.axis("equal")
+            # plt.plot(s, l)
+            # plt.xlabel("S[m]")
+            # plt.ylabel("L[m]")
+            
 
         # longitudinal(v + t) path planning (s_s, ds_s, dds_s, ds_e, dds_e, time)
         target_speed = 5.0
@@ -180,21 +196,22 @@ class LatticePathPlanning:
         # s, v, l, time = [], [], [], []
         # print("horizon_time.time_s: ", self.horizon_time.time_s)
         # for t in np.arange(0.0, self.horizon_time.time_s, 0.1):
-        #     s.append(optimal_trajectory[1].get_point(t))
-        #     v.append(optimal_trajectory[1].get_first_derivative(t))
-        #     l.append(optimal_trajectory[0].get_point(t))
+        #     sampled_s = optimal_lon_trajectory.get_point(t)
+        #     s.append(sampled_s)
+        #     v.append(optimal_lon_trajectory.get_first_derivative(t))
+        #     l.append(optimal_lat_trajectory.get_point(sampled_s))
         #     time.append(t)
         # plt.figure()
         # plt.axis("equal")
         # plt.plot(time, v)
-        # plt.xlabel("Time[s]")
-        # plt.ylabel("Velocity[m/s]")
-        # # plt.plot(s[0], time[0], 'go')
+        # plt.xlabel("T[s]")
+        # plt.ylabel("V[m/s]")
+        
         # plt.figure()
         # plt.axis("equal")
-        # plt.plot(time, l)
-        # plt.xlabel("Time[s]")
-        # plt.ylabel("Lateral[m/s]")
+        # plt.plot(s, l)
+        # plt.xlabel("S[m]")
+        # plt.ylabel("L[m]")
 
         # get the optimal trajectory in frenet
         l = []
