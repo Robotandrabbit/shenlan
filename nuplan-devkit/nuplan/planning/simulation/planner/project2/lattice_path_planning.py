@@ -1,6 +1,7 @@
 import math
 import numpy as np
 import matplotlib.pyplot as plt
+from typing import Tuple
 
 from nuplan.common.actor_state.ego_state import DynamicCarState, EgoState
 from nuplan.planning.simulation.planner.project2.quintic_polynominal import QuinticPolynomial
@@ -29,17 +30,24 @@ class LatticePathPlanning:
         self.reference_line_provider = reference_line_provider
         self.horizon_time = horizon_time
         self.sampling_time = sampling_time
-
-    # 横向上：在 d，t 维度采样 
-    def sample_lateral_end_state(self, init_frenet_state):
+    
+    # 横向上：在 d-s 维度采样。相比较 d-t 采样，d-s 可以明确自车局部的终点，也可以根据 s 获取车道宽度
+    # 约束采样的范围
+    def sample_lateral_end_state_ds(self, init_frenet_state):
         end_d_candidates = np.array([-0.5, 0.0, 0.5])
-        end_t_candidates = np.array([10.0, 20.0, 40.0])
+        end_s_candidates = np.array([10.0, 20.0, 40.0])
+        lb_set, rb_set = self.reference_line_provider.get_boundary(end_s_candidates)
+        print("lb[0], rb[0]: ", lb_set, rb_set)
         
         sampled_states = []
-        for t in end_t_candidates:
+        for idx in range(len(end_s_candidates)):
             for d in end_d_candidates:
+                # 检查超出道路边界
+                sampled_l = init_frenet_state[1][0] + d
+                if (sampled_l > lb_set[idx] or sampled_l < rb_set[idx]):
+                    continue
                 # 基于自车当前位置采样
-                state = np.array([init_frenet_state[1][0] + d, 0.0, 0.0, t])
+                state = np.array([sampled_l, 0.0, 0.0, end_s_candidates[idx]])
                 sampled_states.append(state)
         return sampled_states
     
@@ -101,7 +109,7 @@ class LatticePathPlanning:
             t += 0.1
         return True
 
-    def get_optimal_trajectory(self, lat_trajectories, lon_trajectories) -> list[QuinticPolynomial, QuarticPolynominal]:
+    def get_optimal_trajectory(self, lat_trajectories, lon_trajectories) -> Tuple[QuinticPolynomial, QuarticPolynominal]:
         min_score = float('+inf')
         best_lon_trajectory = None
         best_lat_trajectory = None
@@ -116,7 +124,7 @@ class LatticePathPlanning:
                     best_lon_trajectory = lon_trajectory
                     best_lat_trajectory = lat_trajectory
         # Combine two 1d trajectories to one 2d trajectory
-        return [best_lat_trajectory, best_lon_trajectory]
+        return best_lat_trajectory, best_lon_trajectory
 
 
     def path_planning(self) -> tuple[float, float, float, float]:
@@ -151,16 +159,15 @@ class LatticePathPlanning:
 
                
         lat_trajectory, lon_trajectory = [], []
-        # lateral(l + t) path planning (l_s, dl_s ,ddl_s, l_e, dl_e, ddl_e, time)
-        end_lat_frenet_states = self.sample_lateral_end_state(init_frenet_state, )
-        for end_lat_frenet_state in end_lat_frenet_states:
-            print("l =", end_lat_frenet_state[0], "sampled_time =", end_lat_frenet_state[-1])
+        # lateral(l + s) path planning (l_s, dl_s ,ddl_s, l_e, dl_e, ddl_e, s)
+        end_lat_states = self.sample_lateral_end_state_ds(init_frenet_state)
+        for end_lat_state in end_lat_states:
             lateral_curve = QuinticPolynomial(init_frenet_state[1][0], init_frenet_state[4][0], init_frenet_state[7][0],
-                                              end_lat_frenet_state[0], end_lat_frenet_state[1], end_lat_frenet_state[2], end_lat_frenet_state[3])
+                                              end_lat_state[0], end_lat_state[1], end_lat_state[2], end_lat_state[3])
             lat_trajectory.append(lateral_curve)
 
         # longitudinal(v + t) path planning (s_s, ds_s, dds_s, ds_e, dds_e, time)
-        target_speed = 5
+        target_speed = 5.0
         end_lon_frenet_states = self.sample_lon_end_state(init_frenet_state, target_speed)
         for end_lon_frenet_state in end_lon_frenet_states:
             longitudinal_curve = QuarticPolynominal(init_frenet_state[0][0], init_frenet_state[2][0], init_frenet_state[6][0],
@@ -168,7 +175,7 @@ class LatticePathPlanning:
             lon_trajectory.append(longitudinal_curve)
 
         # get the optimal trajectory
-        optimal_trajectory = self.get_optimal_trajectory(lat_trajectory, lon_trajectory)
+        optimal_lat_trajectory, optimal_lon_trajectory = self.get_optimal_trajectory(lat_trajectory, lon_trajectory)
 
         # s, v, l, time = [], [], [], []
         # print("horizon_time.time_s: ", self.horizon_time.time_s)
@@ -195,12 +202,14 @@ class LatticePathPlanning:
         ddl = []
         s = []
         for t in np.arange(0, self.horizon_time.time_s, self.sampling_time.time_s):
-            if (t > optimal_trajectory[1].get_time()):
+            if (t > optimal_lon_trajectory.get_time()):
                 break
-            l.append(optimal_trajectory[0].get_point(t))
-            dl.append(optimal_trajectory[0].get_first_derivative(t))
-            ddl.append(optimal_trajectory[0].get_second_derivative(t))
-            s.append(optimal_trajectory[1].get_point(t))
+            # 由速度曲线得到 s, 再由 s 得到 l.
+            sampled_s = optimal_lon_trajectory.get_point(t)
+            l.append(optimal_lat_trajectory.get_point(sampled_s))
+            dl.append(optimal_lat_trajectory.get_first_derivative(sampled_s))
+            ddl.append(optimal_lat_trajectory.get_second_derivative(sampled_s))
+            s.append(sampled_s)
             # print("t, l, s:", t, l[-1], s[-1])
         
         return l, dl, ddl, s

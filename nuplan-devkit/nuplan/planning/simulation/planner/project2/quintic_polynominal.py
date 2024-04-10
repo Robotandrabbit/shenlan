@@ -17,7 +17,10 @@ class QuinticPolynomial:
         self.a3 = x[0]
         self.a4 = x[1]
         self.a5 = x[2]
-      
+
+    def get_type(self):
+        return "QuinticPolynominal"
+    
     def get_point(self, t:float):
         xt = self.a0 + self.a1 * t + self.a2 * t ** 2 + self.a3 * t ** 3 + \
              self.a4 * t ** 4 + self.a5 * t ** 5
