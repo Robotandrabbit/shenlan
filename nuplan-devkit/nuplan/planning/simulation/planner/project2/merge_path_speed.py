@@ -28,12 +28,14 @@ def transform_path_planning(
     path_idx2s = []
     s = 0
     path_idx2s.append(s)
-    for idx in np.arange(1, len(path_x), 1):
+    for idx in np.arange(1, len(path_x) - 1, 1):
         pos_cur = np.array([path_x[idx], path_y[idx]])
         pos_pre = np.array([path_x[idx-1], path_y[idx-1]])
         dis = np.linalg.norm(pos_cur - pos_pre)
         s = s + dis
         path_idx2s.append(s)
+    # 强制对齐最后一点的s，以防积分上的误差
+    path_idx2s.append(path_s[-1])
     return path_idx2s, path_x, path_y, path_heading, path_kappa
 
 def cal_dynamic_state(

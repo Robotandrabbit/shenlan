@@ -4,6 +4,7 @@ from typing import List, Type, Optional, Tuple
 
 import numpy as np
 import numpy.typing as npt
+import matplotlib.pyplot as plt
 
 from nuplan.common.actor_state.state_representation import StateVector2D, TimePoint
 from nuplan.common.actor_state.vehicle_parameters import get_pacifica_parameters
@@ -129,7 +130,15 @@ class MyPlanner(AbstractPlanner):
         # 1.Path planning
         lattice_path_planning = LatticePathPlanning (ego_state, reference_path_provider, horizon_time, sampling_time)
         optimal_path_l, optimal_path_dl, optimal_path_ddl, optimal_path_s = lattice_path_planning.path_planning()
-
+        '''
+        print(optimal_path_s[0], optimal_path_s[-1])
+        plt.figure()
+        plt.plot(optimal_path_s, optimal_path_l)
+        plt.plot(optimal_path_s[0], optimal_path_l[0], 'go')
+        plt.plot(optimal_path_s[-1], optimal_path_l[-1], 'ro')
+        plt.axis("equal")
+        plt.show()
+        '''
         # 2.Transform path planning result to cartesian frame
         path_idx2s, path_x, path_y, path_heading, path_kappa = transform_path_planning(optimal_path_s, optimal_path_l, \
                                                                                        optimal_path_dl,
