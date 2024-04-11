@@ -92,7 +92,9 @@ class LatticePathPlanning:
             if (lateral_offset > 0.5):
                 cost += WEIGHT_OFFSET * (lateral_offset - 0.5) / MAXIMUM_OFFSET
             
-            # 4. TODO(wanghao): collision cost:static agent.
+            # TODO(wanghao): add more cost.
+            # 4. collision cost:static agent.
+            # 5. flicker cost
         return cost
 
     def is_valid_lon_trajectory(self, lon_trajectory:QuarticPolynominal) -> bool:
@@ -165,7 +167,6 @@ class LatticePathPlanning:
         lat_trajectory, lon_trajectory = [], []
         # lateral(l + s) path planning (l_s, dl_s ,ddl_s, l_e, dl_e, ddl_e, s)
         end_lat_states = self.sample_lateral_end_state_ds(init_frenet_state)
-        print("end_lat_states size:", len(end_lat_states))
         # 可视化横向采样的path
         # plt.figure()
         for end_lat_state in end_lat_states:

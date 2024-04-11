@@ -47,8 +47,8 @@ DATASET_PARAMS = [
     # "scenario_filter.log_names=['2021.07.16.00.51.05_veh-17_01352_01901']",  # following_lane_without_lead
     # "scenario_filter.scenario_tokens=['628313fbe48550ac']",
 
-    "scenario_filter.log_names=['2021.08.17.16.57.11_veh-08_01200_01636']",  # following_lane_without_lead
-    "scenario_filter.scenario_tokens=['6ec306ff06e35a17']",
+    # "scenario_filter.log_names=['2021.08.17.16.57.11_veh-08_01200_01636']",  # following_lane_without_lead
+    # "scenario_filter.scenario_tokens=['6ec306ff06e35a17']",
 
     # "scenario_filter.log_names=['2021.05.12.22.28.35_veh-35_00620_01164']",  # following_lane_with_slow_lead
     # "scenario_filter.scenario_tokens=['1971267bb0135ef5']",
@@ -74,8 +74,8 @@ DATASET_PARAMS = [
     # "scenario_filter.log_names=['2021.06.14.16.48.02_veh-12_04978_05337']",  # starting_unprotected_cross_turn
     # "scenario_filter.scenario_tokens=['143076200fec5eb1']",
 
-    # "scenario_filter.log_names=['2021.10.01.19.16.42_veh-28_02011_02410']",  # starting_unprotected_cross_turn
-    # "scenario_filter.scenario_tokens=['be051cec36545b3d']",
+    "scenario_filter.log_names=['2021.10.01.19.16.42_veh-28_02011_02410']",  # starting_unprotected_cross_turn
+    "scenario_filter.scenario_tokens=['be051cec36545b3d']",
 
     # "scenario_filter.log_names=['2021.08.17.17.17.01_veh-45_02314_02798']",  # starting_left_turn
     # "scenario_filter.scenario_tokens=['d1352bb76f41547b']",
@@ -101,7 +101,7 @@ cfg = hydra.compose(config_name=simulation_hydra_paths.config_name, overrides=[
     f'ego_controller={EGO_CONTROLLER}',
     f'observation={OBSERVATION}',
     f'hydra.searchpath=[{simulation_hydra_paths.common_dir}, {simulation_hydra_paths.experiment_dir}]',
-    # 'output_dir=${group}/${experiment}/',
+    # 'output_dir=${group}/${experiment}/', 
     'output_dir=${group}/',
     *DATASET_PARAMS,
 ])
@@ -111,7 +111,7 @@ from nuplan.planning.script.run_simulation import run_simulation as main_simulat
 
 # planner = SimplePlanner(horizon_seconds=10.0, sampling_time=0.25, acceleration=[0.0, 0.0])
 # planner = IDMPlanner(target_velocity=10.0, min_gap_to_lead_agent=1.0, headway_time=1.5, accel_max=1.0, decel_max=3.0, planned_trajectory_samples=16, planned_trajectory_sample_interval=0.5, occupancy_map_radius=40)
-planner = MyPlanner(horizon_seconds=8.0, sampling_time=0.25, max_velocity=17)
+planner = MyPlanner(horizon_seconds=8.0, sampling_time=0.25, max_velocity=10)
 
 # Run the simulation loop (real-time visualization not yet supported, see next section for visualization)
 main_simulation(cfg, planner)

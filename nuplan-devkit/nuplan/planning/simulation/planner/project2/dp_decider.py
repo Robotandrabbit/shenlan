@@ -4,7 +4,7 @@ from typing import List, Type, Optional, Tuple
 from nuplan.planning.simulation.planner.project2.frame_transform import get_match_point, cal_project_point
 from shapely.geometry import Point, LineString
 from scipy.interpolate import interp1d
-
+import time
 class DpDecider:
 
     def __init__(self, 
@@ -53,9 +53,11 @@ class DpDecider:
 
         import matplotlib.pyplot as plt
         # 绘制曲线
-        plt.clf()
-
-        for trajectory in self._obs_trajectory:
+        # plt.clf()
+        print("object size:", len(self._obs_trajectory))
+        # 物体太多的话，dp很慢，这里最多遍历5个障碍物
+        num = min(len(self._obs_trajectory), 2)
+        for trajectory in self._obs_trajectory[:num]:
             # 每个agent的trajectory
             points_ts = []
             for state in trajectory:
@@ -71,7 +73,6 @@ class DpDecider:
                 r_h = np.array([x, y])
                 r_r = np.array([proj_x_set[0], proj_y_set[0]])
                 l = np.dot((r_h - r_r), n_r)
-                # Note(wanghao): 只考虑与自车在空间上有overlap的snapshot
                 # 通过判断预测的snapshot距离path的横向距离是否小于半个车宽来判断是否有overlap.
                 if s >= 0 and s <= self._path_idx2s[-1] and abs(l) <= self._ego_half_width:
                     points_ts.append((t, s))
@@ -85,21 +86,21 @@ class DpDecider:
 
             t_points = [point[0] for point in points_ts]
             s_points = [point[1] for point in points_ts]
-            plt.plot(t_points, s_points, color='red')  # 连接成连续曲线并绘制在曲线图上，使用红色线条
+            # plt.plot(t_points, s_points, color='red')  # 连接成连续曲线并绘制在曲线图上，使用红色线条
 
         # S T撒点，T撒点要和后续的速度规划保持一致，S的最大值也和后续的速度规划保持一致(max_v * total_time)
         t_list = np.arange(self._delta_t, self._total_t, self._delta_t) # t = 0不必搜索
         t_list = np.append(t_list, self._total_t)
         max_s = self._max_v * self._total_t
-        delta_s = 2
-        s_list = np.arange(0, max_s, delta_s)
-        s_list = np.append(s_list, max_s)
-        # 稀疏采样可以加快速度，但也容易导致找不到符合约束的dp_s
-        # third = int(max_s / 3)
-        # s_list1 = np.arange(0, third, delta_s)
-        # s_list2 = np.arange(third, max_s, 3 * delta_s)
-        # s_list = np.concatenate((s_list1, s_list2))
+        delta_s = 2.0
+        # s_list = np.arange(0, max_s, delta_s)
         # s_list = np.append(s_list, max_s)
+        # 稀疏采样可以加快速度，但也容易导致找不到符合约束的dp_s
+        third = int(max_s / 3)
+        s_list1 = np.arange(0, third, delta_s)
+        s_list2 = np.arange(third, max_s, 3 * delta_s)
+        s_list = np.concatenate((s_list1, s_list2))
+        s_list = np.append(s_list, max_s)
 
         # 保存dp过程的数据
         dp_st_cost =  [[math.inf] * len(t_list) for _ in range(len(s_list))] # [[t]]
@@ -113,6 +114,7 @@ class DpDecider:
             dp_st_s_dot[i][0] = (s_list[i] - self._ego_length/2) / t_list[0]
 
         # 动态规划主程序
+        loop2_start_time = time.time()
         for i in np.arange(1, len(t_list)):
             # i 为列循环
             for j in range(len(s_list)):
@@ -124,6 +126,9 @@ class DpDecider:
                 for k in range(len(s_list)):
                     pre_row = k
                     pre_col = i - 1
+                    # 跳过倒车节点(前一个时刻s > 当前时刻s)
+                    # if (pre_row > cur_row):
+                    #     break
                     # 计算边的代价 其中起点为pre_row,pre_col 终点为cur_row cur_col
                     cost_temp = self._CalcDpCost(pre_row, pre_col, cur_row, cur_col, s_list, t_list, dp_st_s_dot)
                     if cost_temp + dp_st_cost[pre_row][pre_col] < dp_st_cost[cur_row][cur_col]:
@@ -134,7 +139,8 @@ class DpDecider:
                         dp_st_s_dot[cur_row][cur_col] = (s_end - s_start) / (t_end - t_start)
                         # 将最短路径的前一个节点的行号记录下来
                         dp_st_node[cur_row][cur_col] = pre_row
-        
+        print("loop2 time:", time.time() - loop2_start_time)
+        # print("t_list, s_list size:", len(t_list), len(s_list))
         # 输出dp结果
         # 输出初始化
         dp_speed_s = [-1] * len(t_list)
@@ -156,6 +162,7 @@ class DpDecider:
         #         min_row = -1
         #         min_col = j
         # 先把终点的ST输出出来
+        print("min_row, col:", min_row, min_col)
         s, t = self._CalcSTCoordinate(min_row, min_col, s_list, t_list)
         dp_speed_s[min_col] = s
         dp_speed_t[min_col] = t
@@ -171,69 +178,67 @@ class DpDecider:
         
         s_lb = [0] * len(t_list)
         s_ub = [max_s] * len(t_list)
-        # 根据dp结果和_obs_ts，计算s_lb, s_ub
-        # Note(wanghao): 这在 speed decision中起什么作用呢？
-        for i in range(len(self._obs_ts)):
-            obs_ts = self._obs_ts[i]
-            obs_interp_ts = self._obs_interp_ts[i]
-            bounds = obs_ts.bounds
-            obs_t_min = bounds[0]
-            obs_t_max = bounds[2]
-            for j in range(len(t_list)):
-                t = t_list[j]
-                if t < obs_t_min or t > obs_t_max:
-                    continue
-                s = dp_speed_s[j]
-                # 计算obs在当前t的s，判断决策，输出边界
-                obs_s = obs_interp_ts(t)
-                if s < obs_s: # 避让改上界
-                    s_ub[j] = min(s_ub[j], max(0, obs_s - self._ego_length - self._obs_radius[i]))
-                    if s_ub[j] < s_lb[j] + 0.5:
-                        s_ub[j] = s_lb[j] + 0.5
-                    # s_ub[j] = min(s_ub[j], max(0, obs_s))
-                else: # 超车改下界
-                    s_lb[j] = max(s_lb[j], min(max_s, obs_s + self._ego_length + self._obs_radius[i]))
-                    # s_lb[j] = max(s_lb[j], min(max_s, obs_s))
-                    if s_lb[j] > s_ub[j] - 0.5:
-                        s_lb[j] = s_ub[j] - 0.5
+        # # 根据dp结果和_obs_ts，计算s_lb, s_ub
+        # # Note(wanghao): 这在 speed decision中起什么作用呢？
+        # for i in range(len(self._obs_ts)):
+        #     obs_ts = self._obs_ts[i]
+        #     obs_interp_ts = self._obs_interp_ts[i]
+        #     bounds = obs_ts.bounds
+        #     obs_t_min = bounds[0]
+        #     obs_t_max = bounds[2]
+        #     for j in range(len(t_list)):
+        #         t = t_list[j]
+        #         if t < obs_t_min or t > obs_t_max:
+        #             continue
+        #         s = dp_speed_s[j]
+        #         # 计算obs在当前t的s，判断决策，输出边界
+        #         obs_s = obs_interp_ts(t)
+        #         if s < obs_s: # 避让改上界
+        #             s_ub[j] = min(s_ub[j], max(0, obs_s - self._ego_length - self._obs_radius[i]))
+        #             if s_ub[j] < s_lb[j] + 0.5:
+        #                 s_ub[j] = s_lb[j] + 0.5
+        #             # s_ub[j] = min(s_ub[j], max(0, obs_s))
+        #         else: # 超车改下界
+        #             s_lb[j] = max(s_lb[j], min(max_s, obs_s + self._ego_length + self._obs_radius[i]))
+        #             # s_lb[j] = max(s_lb[j], min(max_s, obs_s))
+        #             if s_lb[j] > s_ub[j] - 0.5:
+        #                 s_lb[j] = s_ub[j] - 0.5
 
-        # 最优的 st rollout profile
-        plt.plot(dp_speed_t, dp_speed_s)
+        # # 最优的 st rollout profile
+        # plt.plot(dp_speed_t, dp_speed_s)
 
-        # 添加标题和标签
-        plt.title('S vs Time')
-        plt.xlabel('T')
-        plt.ylabel('S')
-        plt.ylim((-5, max_s))
+        # # 添加标题和标签
+        # plt.title('S vs Time')
+        # plt.xlabel('T')
+        # plt.ylabel('S')
+        # plt.ylim((-5, max_s))
 
-        # 显示网格
-        plt.grid(True)
+        # # 显示网格
+        # plt.grid(True)
 
-        # 显示图形
+        # # 显示图形
         # plt.show()
-        import os
-        from datetime import datetime
-        # 创建一个文件夹用于保存图片
-        if not os.path.exists("images"):
-            os.mkdir("images")
-        # 获取当前时间并格式化
-        current_datetime = datetime.now()
-        formatted_datetime = current_datetime.strftime("%Y-%m-%d-%H-%M-%S")
+        # import os
+        # from datetime import datetime
+        # # 创建一个文件夹用于保存图片
+        # if not os.path.exists("images"):
+        #     os.mkdir("images")
+        # # 获取当前时间并格式化
+        # current_datetime = datetime.now()
+        # formatted_datetime = current_datetime.strftime("%Y-%m-%d-%H-%M-%S")
 
-        # 设置文件名前缀和扩展名
-        file_name_prefix = "images/figure"
-        file_extension = ".png"
+        # # 设置文件名前缀和扩展名
+        # file_name_prefix = "images/figure"
+        # file_extension = ".png"
 
-        # 拼接完整的文件名
-        file_name = f"{file_name_prefix}_{formatted_datetime}{file_extension}"
+        # # 拼接完整的文件名
+        # file_name = f"{file_name_prefix}_{formatted_datetime}{file_extension}"
 
-        plt.savefig(file_name)
-        print('s_lb: ', s_lb)
-        print('s_ub: ', s_ub)
+        # plt.savefig(file_name)
 
         dp_s_out = [s - self._ego_length/2 for s in dp_speed_s]
         # 输出了 最优 speed profile 的 s 和 v
-        return s_lb, s_ub, dp_s_out, dp_st_s_dot
+        return s_lb, s_ub, dp_s_out, dp_st_s_dot, dp_speed_t
 
 
     def _CalcDpCost(self, row_start, col_start, row_end, col_end, s_list, t_list, dp_st_s_dot):
