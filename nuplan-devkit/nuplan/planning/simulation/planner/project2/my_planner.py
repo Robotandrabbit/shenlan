@@ -101,8 +101,8 @@ class MyPlanner(AbstractPlanner):
         optimal_speed_s, optimal_speed_s_dot, optimal_speed_s_2dot, optimal_speed_t = [], [], [], []
         t = 0.0
         while t < horizon_time /sampling_time:
-            optimal_speed_s.append(5.0 * t)
-            optimal_speed_s_dot.append(5.0)
+            optimal_speed_s.append(default_velocity * t)
+            optimal_speed_s_dot.append(default_velocity)
             optimal_speed_s_2dot.append(0.0)
             optimal_speed_t.append(t)
             t += sampling_time
@@ -153,7 +153,7 @@ class MyPlanner(AbstractPlanner):
         #     path_idx2s, path_x, path_y, path_heading, path_kappa)
         # 1）简单的匀速运动 5m/s
         optimal_speed_s, optimal_speed_s_dot, optimal_speed_s_2dot, optimal_speed_t = \
-            self.get_constant_speed_profile(horizon_time.time_s, sampling_time.time_s, max_velocity)
+            self.get_constant_speed_profile(horizon_time.time_s, sampling_time.time_s, 3.0)
         '''
 
         # 2) DpDecider. TODO(wanghao): 3) TreeSearch
@@ -187,7 +187,7 @@ class MyPlanner(AbstractPlanner):
         for idx in np.arange(1, len(optimal_speed_s_dot), 1):
             optimal_speed_s_2dot.append((optimal_speed_s_dot[idx] - optimal_speed_s_dot[idx - 1]) / self.sampling_time.time_s)
         
-        '''   
+        '''
         # 4.Produce ego trajectory
         state = EgoState(
             car_footprint=ego_state.car_footprint,

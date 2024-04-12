@@ -20,6 +20,9 @@ class QuinticPolynomial:
         self.a4 = x[1]
         self.a5 = x[2]
 
+    def get_param(self)->float:
+        return self.s
+    
     def get_type(self):
         return "QuinticPolynominal"
     
