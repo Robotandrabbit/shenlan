@@ -35,8 +35,8 @@ DATASET_PARAMS = [
     'scenario_builder=nuplan_mini',  # use nuplan mini database (2.5h of 8 autolabeled logs in Las Vegas)
     'scenario_filter=one_continuous_log',  # simulate only one log
 
-    "scenario_filter.log_names=['2021.06.23.15.56.12_veh-16_00839_01285']", # changing_lane
-    "scenario_filter.scenario_tokens=['6d1811320c635e82']",
+    # "scenario_filter.log_names=['2021.06.23.15.56.12_veh-16_00839_01285']", # changing_lane
+    # "scenario_filter.scenario_tokens=['6d1811320c635e82']",
 
     # "scenario_filter.log_names=['2021.07.09.20.59.12_veh-38_01208_01692']",  # near_multiple_vehicles
     # "scenario_filter.scenario_tokens=['4f3cac1a0bcb5b89']",
@@ -59,8 +59,8 @@ DATASET_PARAMS = [
     # "scenario_filter.log_names=['2021.08.17.18.54.02_veh-45_00665_01065']",  # starting_unprotected_cross_turn
     # "scenario_filter.scenario_tokens=['7ff1de6b23035dc8']",
 
-    # "scenario_filter.log_names=['2021.09.16.15.12.03_veh-42_01037_01434']",  # starting_left_turn
-    # "scenario_filter.scenario_tokens=['3ec8944f0e5a5637']",
+    "scenario_filter.log_names=['2021.09.16.15.12.03_veh-42_01037_01434']",  # starting_left_turn
+    "scenario_filter.scenario_tokens=['3ec8944f0e5a5637']",
 
     # "scenario_filter.log_names=['2021.10.05.07.10.04_veh-52_01442_01802']",   # starting_unprotected_cross_turn
     # "scenario_filter.scenario_tokens=['40cef783435759d3']",

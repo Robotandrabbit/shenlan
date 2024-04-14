@@ -37,6 +37,10 @@ class QuarticPolynominal:
       val = 2 * self.a2 + 6 * self.a3 * t + 12 * self.a4 * t ** 2
       return val
   
+  def get_third_derivative(self, t) -> float:
+      val = 6 * self.a3 + 12 * 2 * self.a4 * t
+      return val
+  
 
 def main():
   sxs = 0.0
