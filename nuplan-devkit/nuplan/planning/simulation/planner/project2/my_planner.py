@@ -1,5 +1,6 @@
 import math
 import logging
+import time
 from typing import List, Type, Optional, Tuple
 
 import numpy as np
@@ -17,6 +18,7 @@ from nuplan.planning.simulation.planner.project2.bfs_router import BFSRouter
 from nuplan.planning.simulation.planner.project2.reference_line_provider import ReferenceLineProvider
 from nuplan.planning.simulation.planner.project2.simple_predictor import SimplePredictor
 from nuplan.planning.simulation.planner.project2.abstract_predictor import AbstractPredictor
+from nuplan.planning.simulation.planner.project2.dp_decider import DpDecider
 
 from nuplan.planning.simulation.planner.project2.merge_path_speed import transform_path_planning, cal_dynamic_state, cal_pose
 from nuplan.common.actor_state.ego_state import DynamicCarState, EgoState
@@ -94,13 +96,26 @@ class MyPlanner(AbstractPlanner):
                                                     self.horizon_time, self.sampling_time, self.max_velocity)
 
         return InterpolatedTrajectory(trajectory)
-    
+
+    def get_ref_speed(self) -> float:
+        kappa_interp1d = self._reference_path_provider.get_kappa()
+        current_kappa = kappa_interp1d(30) # 自车所在的位置为 s
+        # print("current_kappa:", current_kappa)
+        if abs(current_kappa) > 0.10:
+            return 1.0
+        elif abs(current_kappa) > 0.05:
+            return 3.0
+        elif abs(current_kappa) > 0.01:
+            return 5.0
+        else:
+            return 8.0
+
     def get_constant_speed_profile(self, horizon_time:float, sampling_time:float, default_velocity:float):
         optimal_speed_s, optimal_speed_s_dot, optimal_speed_s_2dot, optimal_speed_t = [], [], [], []
         t = 0.0
         while t < horizon_time /sampling_time:
-            optimal_speed_s.append(5.0 * t)
-            optimal_speed_s_dot.append(5.0)
+            optimal_speed_s.append(default_velocity * t)
+            optimal_speed_s_dot.append(default_velocity)
             optimal_speed_s_2dot.append(0.0)
             optimal_speed_t.append(t)
             t += sampling_time
@@ -110,7 +125,7 @@ class MyPlanner(AbstractPlanner):
     def planning(self,
                  ego_state: EgoState,
                  reference_path_provider: ReferenceLineProvider,
-                 object: List[TrackedObjects],
+                 objects: TrackedObjects,
                  horizon_time: TimePoint,
                  sampling_time: TimePoint,
                  max_velocity: float) -> List[EgoState]:
@@ -130,15 +145,15 @@ class MyPlanner(AbstractPlanner):
         # 1.Path planning
         lattice_path_planning = LatticePathPlanning (ego_state, reference_path_provider, horizon_time, sampling_time)
         optimal_path_l, optimal_path_dl, optimal_path_ddl, optimal_path_s = lattice_path_planning.path_planning()
-        '''
-        print(optimal_path_s[0], optimal_path_s[-1])
-        plt.figure()
-        plt.plot(optimal_path_s, optimal_path_l)
-        plt.plot(optimal_path_s[0], optimal_path_l[0], 'go')
-        plt.plot(optimal_path_s[-1], optimal_path_l[-1], 'ro')
-        plt.axis("equal")
-        plt.show()
-        '''
+
+        # print(optimal_path_s[0], optimal_path_s[-1])
+        # plt.figure()
+        # plt.plot(optimal_path_s, optimal_path_l)
+        # plt.plot(optimal_path_s[0], optimal_path_l[0], 'go')
+        # plt.plot(optimal_path_s[-1], optimal_path_l[-1], 'ro')
+        # plt.axis("equal")
+        # plt.show()
+
         # 2.Transform path planning result to cartesian frame
         path_idx2s, path_x, path_y, path_heading, path_kappa = transform_path_planning(optimal_path_s, optimal_path_l, \
                                                                                        optimal_path_dl,
@@ -149,10 +164,45 @@ class MyPlanner(AbstractPlanner):
         # optimal_speed_s, optimal_speed_s_dot, optimal_speed_s_2dot, optimal_speed_t = speed_planning( \
         #     ego_state, horizon_time.time_s, max_velocity, object, \
         #     path_idx2s, path_x, path_y, path_heading, path_kappa)
-        # 匀速运动 5m/s
+        # 根据ref line 曲率，限制速度
+        ref_speed = self.get_ref_speed()
+        # 1）简单的匀速运动
         optimal_speed_s, optimal_speed_s_dot, optimal_speed_s_2dot, optimal_speed_t = \
-            self.get_constant_speed_profile(horizon_time.time_s, sampling_time.time_s, max_velocity)
-            
+            self.get_constant_speed_profile(horizon_time.time_s, sampling_time.time_s, ref_speed)
+
+
+        # 2) DpDecider. TODO(wanghao): 3) TreeSearch
+        # predicted_trajectoris = [] # 存储所有动态障碍物轨迹
+        # obs_radius = []
+        # for agent in objects.get_agents():
+        #     temp_traj = []
+        #     # 跳过，若无预测轨迹
+        #     if (len(agent.predictions) == 0):
+        #         continue
+        #     for waypoint in agent.predictions[0].valid_waypoints:
+        #         temp_traj.append([waypoint.time_point * 1e-6, waypoint.x, waypoint.y])
+        #     predicted_trajectoris.append(temp_traj)
+        #     obs_radius.append(0.5 * math.sqrt(agent.box.length ** 2 + agent.box.width ** 2))
+        
+
+        # start_time = time.time()
+        # dp_decider = DpDecider(predicted_trajectoris, obs_radius, path_idx2s, path_x, path_y, path_heading, path_kappa, \
+        #                         self.horizon_time.time_s, self.sampling_time.time_s, ref_speed, \
+        #                         ego_state.agent.box.half_width, ego_state.agent.box.length, ego_state.agent.velocity.magnitude(), \
+        #                         max_acc=5.0, max_dec=-5.0)
+        # _, _, optimal_speed_s, grid_speed_v, optimal_speed_t = dp_decider.dynamic_programming()
+        # print("dp time:", time.time() - start_time)
+        # # 利用 s 的微分求出 v, 也可以通过查找最优(t, s)对应的 grid_speed_v 求出 v
+        # optimal_speed_s_dot = [ego_state.dynamic_car_state.speed]
+        # for idx in np.arange(1, len(optimal_speed_s), 1):
+        #     optimal_speed_s_dot.append((optimal_speed_s[idx] - optimal_speed_s[idx - 1]) / self.sampling_time.time_s)
+
+        # # 利用 v 的微分求出 a
+        # optimal_speed_s_2dot = [ego_state.dynamic_car_state.acceleration]
+        # for idx in np.arange(1, len(optimal_speed_s_dot), 1):
+        #     optimal_speed_s_2dot.append((optimal_speed_s_dot[idx] - optimal_speed_s_dot[idx - 1]) / self.sampling_time.time_s)
+        
+
         # 4.Produce ego trajectory
         state = EgoState(
             car_footprint=ego_state.car_footprint,

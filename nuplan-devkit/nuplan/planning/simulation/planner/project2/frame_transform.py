@@ -76,6 +76,7 @@ def cal_project_point(
         proj_y_set.append(proj_y)
         proj_heading_set.append(proj_heading)
         proj_kappa_set.append(proj_kappa)
+        # print("frenet_path_s size:", len(frenet_path_s), "match_point_index:", match_point_index, "match_s:", frenet_path_s[match_point_index])
         s = cal_proj_s(frenet_path_x, frenet_path_y, frenet_path_s, proj_x, proj_y, match_point_index)
         proj_s_set.append(s)
     return proj_x_set, proj_y_set, proj_heading_set, proj_kappa_set, proj_s_set
@@ -131,8 +132,8 @@ def cartesian2frenet(
     :return s_set
     :return l_set
     :return s_dot_set
-    :return l_dot_set
-    :return dl_set
+    :return l_dot_set  note(wanghao): dl / dt
+    :return dl_set     note(wanghao): dl / ds
     :return l_dot2_set
     :return s_dot2_set
     :return ddl_set

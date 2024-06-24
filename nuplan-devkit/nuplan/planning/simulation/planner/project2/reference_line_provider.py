@@ -172,9 +172,6 @@ class ReferenceLineProvider():
             lb_set.append(lb)
             rb_set.append(rb)
         return lb_set, rb_set
-
-        
-
-
-
-        
+    
+    def get_kappa(self):
+        return self._interp1d_kappa

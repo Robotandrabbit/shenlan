@@ -12,7 +12,7 @@ def transform_path_planning(
     path_ddl: List[float], 
     reference_path_provider: ReferenceLineProvider) -> Tuple[List[float], List[float], List[float], List[float], List[float]]:
     """
-    根据s和路径规划，计算s对应的x y heading kappa
+    根据s和路径规划,计算s对应的x y heading kappa
     
     """
     # 将path从frenet转换到cartesian
@@ -70,7 +70,6 @@ def cal_dynamic_state(
     s = s_set[idx_l] + s_dot_set[idx_l]*delta_t + (1/3)*s_2dot_set[idx_l]*(delta_t**2) + (1/6)*s_2dot_set[idx_r]*(delta_t**2)
     s_dot = s_dot_set[idx_l] + 0.5*s_2dot_set[idx_l]*delta_t + 0.5*s_2dot_set[idx_r]*delta_t
     s_dot2 = s_2dot_set[idx_l] + (s_2dot_set[idx_r] - s_2dot_set[idx_l])*delta_t/(t_set[idx_r] - t_set[idx_l])
-
     return s, s_dot, s_dot2
 
 def cal_pose(
@@ -87,10 +86,15 @@ def cal_pose(
     f_y = interp1d(path_idx2s, path_y)
     f_heading = interp1d(path_idx2s, path_heading)
     f_kappa = interp1d(path_idx2s, path_kappa)
-    x = f_x(s)
-    y = f_y(s)
-    heading = f_heading(s)
-    kappa = f_kappa(s)
-
+    if s <= path_idx2s[-1]:
+        x = f_x(s)
+        y = f_y(s)
+        heading = f_heading(s)
+        kappa = f_kappa(s)
+    else:
+        x = f_x(path_idx2s[-1])
+        y = f_y(path_idx2s[-1])
+        heading = f_heading(path_idx2s[-1])
+        kappa = f_kappa(path_idx2s[-1])
 
     return x, y, heading, kappa
